@@ -1,0 +1,110 @@
+{
+  "info": {
+    "name": "AP2 IC Demo",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Open Invoices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{backend}}/api/invoices/open",
+          "host": [
+            "{{backend}}"
+          ],
+          "path": [
+            "api",
+            "invoices",
+            "open"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Intent Mandate",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"userId\": \"U-1\", \"type\": \"Intent\", \"action\": \"autopay utilities\", \"amountLimit\": 200 }"
+        },
+        "url": {
+          "raw": "{{backend}}/api/mandates",
+          "host": [
+            "{{backend}}"
+          ],
+          "path": [
+            "api",
+            "mandates"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Cart Mandate",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"userId\": \"U-1\", \"type\": \"Cart\", \"action\": \"Pay invoice INV-123\", \"invoiceId\": \"INV-123\", \"amountLimit\": 120 }"
+        },
+        "url": {
+          "raw": "{{backend}}/api/mandates",
+          "host": [
+            "{{backend}}"
+          ],
+          "path": [
+            "api",
+            "mandates"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Pay Invoice",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"mandateId\": \"M-...\", \"signedMandate\": \"<payload.sig>\", \"invoiceId\": \"INV-123\" }"
+        },
+        "url": {
+          "raw": "{{backend}}/api/pay",
+          "host": [
+            "{{backend}}"
+          ],
+          "path": [
+            "api",
+            "pay"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "backend",
+      "value": "http://localhost:3000"
+    }
+  ]
+}

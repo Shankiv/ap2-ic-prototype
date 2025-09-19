@@ -1,0 +1,14 @@
+agent:
+  id: ic-agent
+  name: IC Agent
+  description: ADK-based agent to manage invoices and AP2 mandates for demo
+  runtime: python
+  entrypoint: adk_agent.py
+
+tools:
+  - invoice_tool
+  - mandate_tool
+  - payment_tool
+
+security:
+  allow_guest: false

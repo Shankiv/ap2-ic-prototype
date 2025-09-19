@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Invoice Agent Demo</title></head>
+<body>
+  <h2>Invoice Agent Demo</h2>
+  <input id="userId" placeholder="userId (e.g., whatsapp:+1415...)" style="width:300px"><br><br>
+  <button onclick="showInvoices()">Show Invoices</button>
+  <input id="invoiceId" placeholder="InvoiceId (INV-123)"><button onclick="pay()">Pay</button>
+  <pre id="out"></pre>
+<script>
+const AGENT = prompt("Agent URL (ex: https://agent-adk-demo.onrender.com)","https://");
+async function showInvoices(){
+  const uid = document.getElementById('userId').value;
+  const res = await fetch(`${AGENT}/agent/invoices/${encodeURIComponent(uid)}`);
+  const j = await res.json();
+  document.getElementById('out').textContent = JSON.stringify(j, null, 2);
+}
+async function pay(){
+  const uid = document.getElementById('userId').value;
+  const invoiceId = document.getElementById('invoiceId').value;
+  const res = await fetch(`${AGENT}/agent/pay`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ userId: uid, invoiceId })
+  });
+  const j = await res.json();
+  document.getElementById('out').textContent = JSON.stringify(j, null, 2);
+}
+</script>
+</body>
+</html>
