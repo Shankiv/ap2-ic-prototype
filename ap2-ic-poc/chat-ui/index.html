@@ -1,31 +1,250 @@
 <!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Invoice Agent Demo</title></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>IC Agent Demo</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; max-width:1000px; margin:24px auto; color:#0f172a; padding:0 16px; }
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    h1{margin:0;font-size:20px}
+    .row { display:flex; gap:8px; align-items:center; margin:8px 0; }
+    input, select, textarea { padding:8px 10px; border-radius:8px; border:1px solid #e6eef0; font-size:14px; }
+    button { padding:8px 12px; border-radius:8px; border:none; background:#0ea5a4; color:white; cursor:pointer; }
+    button.secondary { background:#64748b; }
+    .card { background:#fff; border:1px solid #eef2f7; padding:12px; border-radius:10px; box-shadow:0 6px 18px rgba(12,18,26,0.03); margin-bottom:12px; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th, td { text-align:left; padding:8px; border-bottom:1px solid #f1f5f9; font-size:13px; }
+    th { color:#334155; font-weight:700; }
+    .small { font-size:13px; color:#64748b; }
+    .toast { position:fixed; right:18px; bottom:18px; background:#0f172a; color:#fff; padding:10px 14px; border-radius:8px; z-index:2000; }
+    .hint { font-size:12px; color:#64748b; margin-top:6px; }
+  </style>
+</head>
 <body>
-  <h2>Invoice Agent Demo</h2>
-  <input id="userId" placeholder="userId (e.g., whatsapp:+1415...)" style="width:300px"><br><br>
-  <button onclick="showInvoices()">Show Invoices</button>
-  <input id="invoiceId" placeholder="InvoiceId (INV-123)"><button onclick="pay()">Pay</button>
-  <pre id="out"></pre>
+  <header>
+    <h1>IC Agent Demo — Invoices & Receipts</h1>
+    <div style="flex:1"></div>
+    <div class="small">AP2 prototype • voice-enabled (Siri/Alexa/GPT)</div>
+  </header>
+
+  <div class="card">
+    <div class="row">
+      <input id="agentUrl" placeholder="Agent URL (e.g. https://agent-xxx.repl.co)" style="flex:1" />
+      <input id="backendUrl" placeholder="Backend URL (e.g. https://backend-xxx.repl.co)" style="width:360px" />
+      <button id="saveBtn">Save</button>
+      <button id="clearBtn" class="secondary">Clear</button>
+    </div>
+    <div class="hint">Paste base URLs (no trailing path). Save to persist to localStorage.</div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;gap:12px;">
+      <div style="flex:1">
+        <div class="row">
+          <input id="userId" placeholder="User ID (e.g. whatsapp:+1415... or test-user)" style="flex:1" value="test-user" />
+          <select id="categoryFilter" style="width:160px;">
+            <option value="">All categories</option>
+            <option value="utility">Utilities</option>
+            <option value="tax">Tax</option>
+            <option value="insurance">Insurance</option>
+          </select>
+          <button id="refreshInvoices">Refresh</button>
+        </div>
+
+        <div id="invoicesList" style="margin-top:12px;" class="small">Load invoices to begin. Tip: say “Pay bill 209” or “Pay my Eversource bill”.</div>
+      </div>
+
+      <div style="width:360px">
+        <div style="margin-bottom:10px">
+          <div class="row">
+            <input id="q" placeholder="Search invoices (vendor, label, id)" style="flex:1" />
+            <button id="btnSearch">Search</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <h4 style="margin:0 0 8px 0">Receipts (Audit Trail)</h4>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="refreshReceipts">Refresh Receipts</button>
+            <div style="flex:1"></div>
+            <div id="receiptCount" class="small"></div>
+          </div>
+          <div id="receiptsArea" style="margin-top:10px" class="small">No receipts yet.</div>
+        </div>
+
+        <div>
+          <h4 style="margin:0 0 8px 0">Quick Actions</h4>
+          <div style="display:flex;gap:8px">
+            <button id="createIntent">Create Intent Mandate</button>
+            <button id="resetDemo" class="secondary">Reset Demo Data</button>
+          </div>
+          <div id="intentMsg" class="hint"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="messages"></div>
+
 <script>
-const AGENT = prompt("Agent URL (ex: https://agent-adk-demo.onrender.com)","https://");
-async function showInvoices(){
-  const uid = document.getElementById('userId').value;
-  const res = await fetch(`${AGENT}/agent/invoices/${encodeURIComponent(uid)}`);
-  const j = await res.json();
-  document.getElementById('out').textContent = JSON.stringify(j, null, 2);
-}
-async function pay(){
-  const uid = document.getElementById('userId').value;
-  const invoiceId = document.getElementById('invoiceId').value;
-  const res = await fetch(`${AGENT}/agent/pay`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ userId: uid, invoiceId })
+  const $ = id => document.getElementById(id);
+
+  function toast(msg, t=3500) {
+    const d = document.createElement('div');
+    d.className = 'toast';
+    d.textContent = msg;
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(), t);
+  }
+
+  // load/save urls
+  $('saveBtn').addEventListener('click', ()=> {
+    localStorage.setItem('agentUrl', $('agentUrl').value.trim());
+    localStorage.setItem('backendUrl', $('backendUrl').value.trim());
+    toast('URLs saved');
   });
-  const j = await res.json();
-  document.getElementById('out').textContent = JSON.stringify(j, null, 2);
-}
+  $('clearBtn').addEventListener('click', ()=> {
+    localStorage.removeItem('agentUrl'); localStorage.removeItem('backendUrl');
+    $('agentUrl').value=''; $('backendUrl').value='';
+    toast('Cleared saved URLs');
+  });
+
+  window.addEventListener('load', ()=>{
+    $('agentUrl').value = localStorage.getItem('agentUrl') || '';
+    $('backendUrl').value = localStorage.getItem('backendUrl') || '';
+    // auto-refresh if urls exist
+    if ($('agentUrl').value) refreshInvoices();
+    if ($('backendUrl').value) fetchReceipts();
+  });
+
+  async function apiFetch(url, opts) {
+    try {
+      const r = await fetch(url, opts);
+      const txt = await r.text();
+      try { return JSON.parse(txt); } catch(e) { return { ok:false, raw: txt, status: r.status }; }
+    } catch(e) {
+      return { ok:false, error: e.toString() };
+    }
+  }
+
+  async function refreshInvoices(){
+    const agent = $('agentUrl').value.trim();
+    if (!agent) { toast('Set Agent URL'); return; }
+    const uid = $('userId').value.trim() || 'test-user';
+    const category = $('categoryFilter').value || '';
+    let url = `${agent.replace(/\/$/,'')}/agent/invoices/${encodeURIComponent(uid)}`;
+    if (category) url += `?category=${encodeURIComponent(category)}`;
+    const res = await apiFetch(url);
+    if (!res || res.success === false) { $('invoicesList').textContent = 'Failed to load invoices'; toast('Failed to load invoices'); return; }
+    const invoices = (res.data && res.data.raw) ? res.data.raw : (res.data || []);
+    if (!invoices || invoices.length === 0) { $('invoicesList').innerHTML = '<div class="small">No open invoices.</div>'; return; }
+    let html = '<table><tr><th>Short</th><th>Label</th><th>Amount</th><th>Due</th><th></th></tr>';
+    invoices.forEach(inv => {
+      html += `<tr>
+        <td>#${inv.shortId}</td>
+        <td>${inv.label}<div class="small">${inv.vendor}</div></td>
+        <td>$${inv.amount}</td>
+        <td>${inv.dueDate}</td>
+        <td><button onclick="payInvoice('${inv.invoiceId}')">Pay</button></td>
+      </tr>`;
+    });
+    html += '</table>';
+    $('invoicesList').innerHTML = html;
+  }
+
+  async function payInvoice(invId) {
+    const agent = $('agentUrl').value.trim();
+    if (!agent) { toast('Set Agent URL'); return; }
+    const uid = $('userId').value.trim() || 'test-user';
+    toast('Processing payment...');
+    const res = await apiFetch(`${agent.replace(/\/$/,'')}/agent/pay`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ userId: uid, invoiceId: invId })
+    });
+    if (res && res.success) {
+      toast(res.speak || res.message || 'Payment successful');
+      fetchReceipts();
+      refreshInvoices();
+    } else {
+      toast('Payment failed');
+      console.error(res);
+    }
+  }
+
+  $('refreshInvoices').addEventListener('click', refreshInvoices);
+
+  // Search
+  $('btnSearch').addEventListener('click', async () => {
+    const q = $('q').value.trim();
+    if (!q) { toast('Enter a search query'); return; }
+    const agent = $('agentUrl').value.trim();
+    const uid = $('userId').value.trim() || 'test-user';
+    const category = $('categoryFilter').value || '';
+    let url = `${agent.replace(/\/$/,'')}/agent/search?q=${encodeURIComponent(q)}&userId=${encodeURIComponent(uid)}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    const res = await apiFetch(url);
+    if (res && res.success) {
+      const invoices = res.data && res.data.invoices ? res.data.invoices : [];
+      if (!invoices.length) { $('searchResults').textContent = 'No results'; toast('No results'); return; }
+      const html = invoices.map(i => `${i.shortId} — ${i.label} — $${i.amount}`).join('<br>');
+      // show results in invoicesList area for convenience
+      $('invoicesList').innerHTML = `<div class="small">${html}</div>`;
+    } else {
+      toast('Search failed');
+      console.error(res);
+    }
+  });
+
+  // Create intent mandate (simple)
+  $('createIntent').addEventListener('click', async ()=>{
+    const agent = $('agentUrl').value.trim(); if(!agent){ toast('Set Agent URL'); return; }
+    const uid = $('userId').value.trim() || 'test-user';
+    const action = prompt('Intent action (e.g., autopay utilities)') || 'autopay';
+    const limitStr = prompt('Amount limit (e.g., 200) — leave blank for none') || '';
+    const amountLimit = limitStr ? parseFloat(limitStr) : null;
+    const payload = { userId: uid, action, amountLimit };
+    // Agent endpoint /agent/intent will forward to backend
+    const res = await apiFetch(`${agent.replace(/\/$/,'')}/agent/intent`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    if (res && res.success) {
+      $('intentMsg').textContent = res.message || 'Intent created';
+      toast('Intent created');
+    } else {
+      toast('Intent creation failed');
+      console.error(res);
+    }
+  });
+
+  // Receipts
+  $('refreshReceipts').addEventListener('click', fetchReceipts);
+  async function fetchReceipts() {
+    const backend = $('backendUrl').value.trim();
+    if (!backend) { toast('Set Backend URL'); return; }
+    const res = await apiFetch(`${backend.replace(/\/$/,'')}/api/receipts`);
+    if (res && res.success) {
+      const rows = (res.data && res.data.receipts) ? res.data.receipts : [];
+      if (!rows.length) { $('receiptsArea').innerHTML = 'No receipts yet.'; $('receiptCount').textContent = ''; return; }
+      let html = '<table><tr><th>Receipt</th><th>Invoice</th><th>Amount</th><th>Paid At</th></tr>';
+      rows.slice().reverse().forEach(r => {
+        html += `<tr><td>${r.receiptId}</td><td>${r.invoiceId}</td><td>$${r.amount}</td><td>${new Date(r.paidAt).toLocaleString()}</td></tr>`;
+      });
+      html += '</table>';
+      $('receiptsArea').innerHTML = html;
+      $('receiptCount').textContent = `${rows.length} receipts`;
+    } else {
+      toast('Failed to fetch receipts'); console.error(res);
+    }
+  }
+
+  // Reset demo
+  $('resetDemo').addEventListener('click', async ()=>{
+    if (!confirm('Reset demo data?')) return;
+    const backend = $('backendUrl').value.trim(); if(!backend){ toast('Set Backend URL'); return; }
+    const res = await apiFetch(`${backend.replace(/\/$/,'')}/api/_reset`, { method:'POST' });
+    if (res && res.success) { toast('Reset done'); refreshInvoices(); fetchReceipts(); } else { toast('Reset failed'); console.error(res); }
+  });
+
 </script>
 </body>
 </html>

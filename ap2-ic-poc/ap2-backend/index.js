@@ -1,101 +1,113 @@
-// index.js - AP2-style demo backend (educational HMAC signing)
+// ap2-backend/index.js
 const express = require('express');
 const bodyParser = require('body-parser');
-const crypto = require('crypto');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 
 const app = express();
-app.use(bodyParser.json());
 app.use(cors());
+app.use(bodyParser.json());
 
-// In-memory demo store
+const SECRET = process.env.DEV_SECRET || 'demo-secret-ic';
+
+// ---------------- Invoices ----------------
 let invoices = [
-  { invoiceId: 'INV-123', amount: 120, dueDate: '2025-09-30', paid: false },
-  { invoiceId: 'INV-124', amount: 80, dueDate: '2025-10-05', paid: false }
+  { userId: 'test-user', invoiceId: 'INV-201', shortId: '201', category: 'utility', label: 'Electric — Eversource', vendor: 'Eversource Energy', description: 'Electric service - residential', amount: 145.23, dueDate: '2025-10-05', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-202', shortId: '202', category: 'utility', label: 'Natural Gas — National Grid', vendor: 'National Grid', description: 'Natural gas service', amount: 78.45, dueDate: '2025-10-07', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-203', shortId: '203', category: 'utility', label: 'Water & Sewer — City of Boston', vendor: 'Boston Water & Sewer', description: 'Water and sewer charges', amount: 62.10, dueDate: '2025-10-12', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-204', shortId: '204', category: 'utility', label: 'Internet — Xfinity', vendor: 'Comcast Xfinity', description: 'Business internet & cable', amount: 129.99, dueDate: '2025-10-03', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-205', shortId: '205', category: 'utility', label: 'Phone — Verizon', vendor: 'Verizon', description: 'Mobile & voice plan', amount: 59.99, dueDate: '2025-10-08', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-206', shortId: '206', category: 'insurance', label: 'Home Insurance — Liberty Mutual', vendor: 'Liberty Mutual', description: 'Homeowners insurance premium', amount: 320.00, dueDate: '2025-10-15', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-207', shortId: '207', category: 'insurance', label: 'Health Insurance — Blue Cross MA', vendor: 'Blue Cross Blue Shield of MA', description: 'Monthly health insurance premium', amount: 412.50, dueDate: '2025-10-20', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-208', shortId: '208', category: 'insurance', label: 'Commercial Insurance — Hanover', vendor: 'The Hanover Insurance Group', description: 'Business general liability', amount: 760.00, dueDate: '2025-10-18', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-209', shortId: '209', category: 'tax', label: 'Property Tax — City of Boston', vendor: 'City of Boston', description: 'Property tax installment', amount: 950.00, dueDate: '2025-10-01', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-210', shortId: '210', category: 'tax', label: 'State Tax — MA Dept. of Revenue', vendor: 'Massachusetts Dept. of Revenue', description: 'Quarterly state tax payment', amount: 1800.00, dueDate: '2025-10-11', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-211', shortId: '211', category: 'tax', label: 'Federal Tax — IRS', vendor: 'Internal Revenue Service', description: 'Estimated federal tax payment', amount: 2400.00, dueDate: '2025-10-15', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-212', shortId: '212', category: 'insurance', label: 'Flood Insurance — Northeast Flood', vendor: 'Northeast Flood Insurance', description: 'Flood insurance premium', amount: 220.00, dueDate: '2025-10-22', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-213', shortId: '213', category: 'insurance', label: 'Health — Harvard Pilgrim', vendor: 'Harvard Pilgrim Health Care', description: 'Supplemental health coverage', amount: 134.75, dueDate: '2025-10-09', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-214', shortId: '214', category: 'utility', label: 'Waste Collection — Boston Trash Services', vendor: 'Boston Trash Services', description: 'Commercial waste pickup', amount: 99.00, dueDate: '2025-10-06', paid: false },
+  { userId: 'test-user', invoiceId: 'INV-215', shortId: '215', category: 'utility', label: 'Energy Surcharge — Eversource', vendor: 'Eversource Energy', description: 'One-time surcharge / adjustment', amount: 45.67, dueDate: '2025-10-04', paid: false }
 ];
-let mandates = {}; // mandateId -> {mandate, signed}
+
 let receipts = [];
 
-// Demo secret key for HMAC (change per environment)
-const SECRET = process.env.DEV_SECRET || 'demo-key-please-change-123';
+// ---------- Helpers ----------
+function ok(data, msg) { return { success: true, message: msg || 'ok', data }; }
+function err(msg, code = 400) { return { success: false, message: msg, code }; }
 
-// Helpers
-function base64url(input) {
-  return Buffer.from(input).toString('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-}
-function signMandate(mandateObj) {
-  const payload = base64url(JSON.stringify(mandateObj));
-  const hmac = crypto.createHmac('sha256', SECRET).update(payload).digest('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  return `${payload}.${hmac}`;
-}
-function verifyMandate(compact) {
-  const parts = compact.split('.');
-  if (parts.length !== 2) return null;
-  const [payload, sig] = parts;
-  const expected = crypto.createHmac('sha256', SECRET).update(payload).digest('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  if (expected !== sig) return null;
-  try {
-    return JSON.parse(Buffer.from(payload.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8'));
-  } catch (e) {
-    return null;
+// ---------- Endpoints ----------
+
+// Invoices: supports userId, category, q (search)
+app.get('/api/invoices', (req, res) => {
+  const q = (req.query.q || '').toLowerCase();
+  const user = (req.query.userId || '').trim();
+  const category = (req.query.category || '').toLowerCase();
+
+  let results = invoices.slice();
+
+  if (user) results = results.filter(i => i.userId === user);
+  if (category) results = results.filter(i => (i.category || '').toLowerCase() === category);
+  if (q) {
+    results = results.filter(inv =>
+      (inv.invoiceId || '').toLowerCase().includes(q) ||
+      (inv.shortId || '').toLowerCase().includes(q) ||
+      (inv.vendor || '').toLowerCase().includes(q) ||
+      (inv.label || '').toLowerCase().includes(q) ||
+      (inv.description || '').toLowerCase().includes(q)
+    );
+  } else {
+    results = results.filter(i => !i.paid);
   }
-}
 
-// Endpoints
-
-// 1. List open invoices
-app.get('/api/invoices/open', (req, res) => {
-  res.json(invoices.filter(i => !i.paid));
+  const message = q ? `Found ${results.length} invoices for "${q}"` : `Returning ${results.length} open invoices`;
+  res.json(ok({ invoices: results }, message));
 });
 
-// 2. Create Intent/Cart Mandate (signed)
+// Single invoice lookup
+app.get('/api/invoices/:id', (req, res) => {
+  const inv = invoices.find(i => i.invoiceId === req.params.id);
+  if (!inv) return res.status(404).json(err('Invoice not found', 404));
+  res.json(ok({ invoice: inv }, 'Invoice found'));
+});
+
+// Mandates
 app.post('/api/mandates', (req, res) => {
-  // body: { userId, type: "Intent"|"Cart", action, amountLimit?, invoiceId?, expiry? }
-  const body = req.body || {};
-  if (!body.userId || !body.type || !body.action) {
-    return res.status(400).json({ error: 'userId, type, action required' });
-  }
-  const mandateId = 'M-' + crypto.randomBytes(6).toString('hex');
-  const mandate = {
-    mandateId, createdAt: new Date().toISOString(), ...body
-  };
-  const signed = signMandate(mandate);
-  mandates[mandateId] = { mandate, signed };
-  res.json({ mandateId, signedMandate: signed });
+  const { userId, type, action, amountLimit, invoiceId } = req.body;
+  if (!userId || !invoiceId) return res.status(400).json(err('Missing fields'));
+  const mandateId = `M-${Math.random().toString(36).substring(2, 10)}`;
+  const mandate = { mandateId, createdAt: new Date().toISOString(), userId, type, action, amountLimit, invoiceId };
+  const signedMandate = jwt.sign(mandate, SECRET);
+  res.json(ok({ ...mandate, signedMandate }, 'Mandate created'));
 });
 
-// 3. Pay using mandate
+// Pay
 app.post('/api/pay', (req, res) => {
-  // body: { mandateId, signedMandate, invoiceId, paymentMethod }
-  const { mandateId, signedMandate, invoiceId, paymentMethod } = req.body || {};
-  if (!mandateId || !signedMandate || !invoiceId) {
-    return res.status(400).json({ error: 'mandateId, signedMandate, invoiceId required' });
+  const { mandateId, signedMandate, invoiceId, paymentMethod } = req.body;
+  try {
+    const verified = jwt.verify(signedMandate, SECRET);
+    const inv = invoices.find(i => i.invoiceId === invoiceId);
+    if (!inv || inv.paid) return res.status(400).json(err('Invoice not found or already paid'));
+
+    inv.paid = true;
+    const receipt = {
+      receiptId: `R-${Math.random().toString(36).substring(2, 10)}`,
+      invoiceId,
+      amount: inv.amount,
+      paymentMethod: paymentMethod || 'demo-card-xxxx',
+      paidAt: new Date().toISOString()
+    };
+    receipts.push(receipt);
+    res.json(ok({ receipt, verifiedMandate: verified }, 'Payment processed'));
+  } catch (e) {
+    res.status(400).json(err('Invalid mandate token'));
   }
-
-  const mand = verifyMandate(signedMandate);
-  if (!mand) return res.status(403).json({ error: 'invalid mandate signature' });
-
-  if (mand.mandateId !== mandateId) return res.status(400).json({ error: 'mandateId mismatch' });
-
-  const invoice = invoices.find(i => i.invoiceId === invoiceId);
-  if (!invoice) return res.status(404).json({ error: 'invoice not found' });
-  if (invoice.paid) return res.status(400).json({ error: 'invoice already paid' });
-
-  if (mand.amountLimit && invoice.amount > mand.amountLimit) {
-    return res.status(403).json({ error: 'invoice exceeds mandate amountLimit' });
-  }
-
-  // Mock payment processing — in prod integrate with gateway
-  invoice.paid = true;
-  const receipt = { receiptId: 'R-' + crypto.randomBytes(6).toString('hex'), invoiceId, amount: invoice.amount, paidAt: new Date().toISOString(), paymentMethod: paymentMethod || 'demo' };
-  receipts.push(receipt);
-
-  // Return audit trail info (signed mandate + receipt)
-  res.json({ success: true, receipt, verifiedMandate: mand });
 });
 
-// Health
-app.get('/health', (req, res) => res.json({ ok: true }));
+// Receipts audit trail
+app.get('/api/receipts', (req, res) => {
+  res.json(ok({ receipts }, `Total ${receipts.length} receipts`));
+});
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`AP2 demo backend running on ${port}`));
+// ---------- Start ----------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`AP2 demo backend running on ${PORT}`));

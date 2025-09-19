@@ -1,110 +1,185 @@
 {
   "info": {
-    "name": "AP2 IC Demo",
+    "name": "AP2-IC Demo",
+    "_postman_id": "b2f4e50d-9d8d-4f99-bb19-ic-ap2-demo",
+    "description": "InvoiceCloud AP2 demo: backend + agent endpoints (invoices, mandates, pay, receipts)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Get Open Invoices",
+      "name": "Backend — List Invoices (all open, test-user)",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{backend}}/api/invoices/open",
-          "host": [
-            "{{backend}}"
-          ],
-          "path": [
-            "api",
-            "invoices",
-            "open"
+          "raw": "{{backendUrl}}/api/invoices?userId=test-user",
+          "host": ["{{backendUrl}}"],
+          "path": ["api", "invoices"],
+          "query": [
+            { "key": "userId", "value": "test-user" }
           ]
         }
       }
     },
     {
-      "name": "Create Intent Mandate",
+      "name": "Backend — List Invoices by Category (insurance)",
       "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"userId\": \"U-1\", \"type\": \"Intent\", \"action\": \"autopay utilities\", \"amountLimit\": 200 }"
-        },
+        "method": "GET",
         "url": {
-          "raw": "{{backend}}/api/mandates",
-          "host": [
-            "{{backend}}"
-          ],
-          "path": [
-            "api",
-            "mandates"
+          "raw": "{{backendUrl}}/api/invoices?userId=test-user&category=insurance",
+          "host": ["{{backendUrl}}"],
+          "path": ["api", "invoices"],
+          "query": [
+            { "key": "userId", "value": "test-user" },
+            { "key": "category", "value": "insurance" }
           ]
         }
       }
     },
     {
-      "name": "Create Cart Mandate",
+      "name": "Backend — Search Invoices (q=eversource)",
       "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"userId\": \"U-1\", \"type\": \"Cart\", \"action\": \"Pay invoice INV-123\", \"invoiceId\": \"INV-123\", \"amountLimit\": 120 }"
-        },
+        "method": "GET",
         "url": {
-          "raw": "{{backend}}/api/mandates",
-          "host": [
-            "{{backend}}"
-          ],
-          "path": [
-            "api",
-            "mandates"
+          "raw": "{{backendUrl}}/api/invoices?userId=test-user&q=eversource",
+          "host": ["{{backendUrl}}"],
+          "path": ["api", "invoices"],
+          "query": [
+            { "key": "userId", "value": "test-user" },
+            { "key": "q", "value": "eversource" }
           ]
         }
       }
     },
     {
-      "name": "Pay Invoice",
+      "name": "Backend — Get Single Invoice",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{backendUrl}}/api/invoices/INV-201",
+          "host": ["{{backendUrl}}"],
+          "path": ["api", "invoices", "INV-201"]
+        }
+      }
+    },
+    {
+      "name": "Backend — Create Mandate",
       "request": {
         "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{ \"mandateId\": \"M-...\", \"signedMandate\": \"<payload.sig>\", \"invoiceId\": \"INV-123\" }"
+          "raw": "{\n  \"userId\": \"test-user\",\n  \"type\": \"Cart\",\n  \"action\": \"Pay invoice INV-201\",\n  \"amountLimit\": 145.23,\n  \"invoiceId\": \"INV-201\"\n}"
         },
         "url": {
-          "raw": "{{backend}}/api/pay",
-          "host": [
-            "{{backend}}"
-          ],
-          "path": [
-            "api",
-            "pay"
+          "raw": "{{backendUrl}}/api/mandates",
+          "host": ["{{backendUrl}}"],
+          "path": ["api", "mandates"]
+        }
+      }
+    },
+    {
+      "name": "Backend — Pay Invoice (using mandate)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mandateId\": \"M-demo\",\n  \"signedMandate\": \"<paste-token-here>\",\n  \"invoiceId\": \"INV-201\",\n  \"paymentMethod\": \"demo-card-xxxx\"\n}"
+        },
+        "url": {
+          "raw": "{{backendUrl}}/api/pay",
+          "host": ["{{backendUrl}}"],
+          "path": ["api", "pay"]
+        }
+      }
+    },
+    {
+      "name": "Backend — Receipts",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{backendUrl}}/api/receipts",
+          "host": ["{{backendUrl}}"],
+          "path": ["api", "receipts"]
+        }
+      }
+    },
+    {
+      "name": "Agent — List Invoices",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{agentUrl}}/agent/invoices/test-user",
+          "host": ["{{agentUrl}}"],
+          "path": ["agent", "invoices", "test-user"]
+        }
+      }
+    },
+    {
+      "name": "Agent — List Invoices by Category (tax)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{agentUrl}}/agent/invoices/test-user?category=tax",
+          "host": ["{{agentUrl}}"],
+          "path": ["agent", "invoices", "test-user"],
+          "query": [
+            { "key": "category", "value": "tax" }
           ]
+        }
+      }
+    },
+    {
+      "name": "Agent — Search Invoices (q=verizon)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{agentUrl}}/agent/search?q=verizon&userId=test-user",
+          "host": ["{{agentUrl}}"],
+          "path": ["agent", "search"],
+          "query": [
+            { "key": "q", "value": "verizon" },
+            { "key": "userId", "value": "test-user" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Agent — Pay Invoice by ID",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"test-user\",\n  \"invoiceId\": \"INV-202\"\n}"
+        },
+        "url": {
+          "raw": "{{agentUrl}}/agent/pay",
+          "host": ["{{agentUrl}}"],
+          "path": ["agent", "pay"]
+        }
+      }
+    },
+    {
+      "name": "Agent — Pay Invoice by VoiceRef (spoken)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"test-user\",\n  \"voiceRef\": \"pay my Eversource bill\"\n}"
+        },
+        "url": {
+          "raw": "{{agentUrl}}/agent/pay",
+          "host": ["{{agentUrl}}"],
+          "path": ["agent", "pay"]
         }
       }
     }
   ],
   "variable": [
-    {
-      "key": "backend",
-      "value": "http://localhost:3000"
-    }
+    { "key": "backendUrl", "value": "https://<your-backend>.replit.dev" },
+    { "key": "agentUrl", "value": "https://<your-agent>.replit.dev" }
   ]
 }
